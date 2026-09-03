@@ -12,7 +12,8 @@ Add Postgres and Redis from the same project (New → Database).
 
 Root directory: `/` (the repo root — `apps/backend` is an npm workspace and
 cannot resolve its dependencies from its own folder).
-Dockerfile path: `apps/backend/Dockerfile`. `railway.json` already sets both.
+Dockerfile path: `apps/backend/Dockerfile`. `.railway/railway.ts` sets both. (`railway.json` is deprecated —
+Railway rejects it and silently falls back to auto-detection.)
 
 ## 3. Environment variables
 
