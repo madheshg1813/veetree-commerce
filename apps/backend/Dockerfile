@@ -19,9 +19,11 @@ ARG NODE_VERSION=22-slim
 FROM node:${NODE_VERSION} AS builder
 WORKDIR /repo
 
-# Native deps for the build stage only (sharp, argon2 and friends).
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
- && rm -rf /var/lib/apt/lists/*
+# No apt layer on purpose. The only two packages in this tree that can compile
+# native code — sharp and msgpackr-extract — both ship prebuilt binaries as
+# optional platform deps (@img/sharp-linux-x64, @msgpackr-extract/*), so nothing
+# needs python3/make/g++. Installing them cost a build step that failed on
+# Railway's builder for a toolchain the install never used.
 
 # Workspace manifests first, so a dependency-free code change reuses this layer.
 COPY package.json package-lock.json turbo.json ./
