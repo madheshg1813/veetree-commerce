@@ -12,4 +12,9 @@
 .git
 **/.DS_Store
 *.log
-apps/storefront
+# The storefront is not part of this image, but npm ci resolves the ROOT
+# lockfile and that requires every workspace's manifest to exist. Excluding the
+# folder outright made the Dockerfile's `COPY apps/storefront/package.json`
+# fail with "not found". Keep the manifest, drop everything else.
+apps/storefront/**
+!apps/storefront/package.json
