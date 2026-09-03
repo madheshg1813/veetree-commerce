@@ -47,10 +47,18 @@ const redisModules = redisUrl
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
-    // Railway's Postgres requires TLS; a local socket does not offer it.
+    /**
+     * SSL is stated in both directions, never left to the default.
+     *
+     * With NODE_ENV=production Medusa turns SSL on by itself. Against a plain
+     * server that produced a connection which opened at TCP level — the probe
+     * confirmed CONNECTED — and then hung until Medusa's own 10 second timeout,
+     * reported as "Could not connect to the database". `ssl: false` is the fix,
+     * and it has to be explicit.
+     */
     databaseDriverOptions: process.env.DATABASE_SSL === "true"
       ? { connection: { ssl: { rejectUnauthorized: false } } }
-      : undefined,
+      : { connection: { ssl: false } },
     /**
      * Two services share this image on Railway: one serves HTTP, one runs the
      * workers. MEDUSA_WORKER_MODE picks which, and defaults to "shared" so a
