@@ -30,11 +30,17 @@ const redisUrl = process.env.REDIS_URL
 /**
  * Razorpay, registered only when keys are present.
  *
- * There is no official Razorpay provider for Medusa v2 — this is a community
- * package (@sgftech/payment-razorpay). It does implement the real v2 contract:
- * it extends AbstractPaymentProvider from @medusajs/framework/utils and
- * provides all ten interface methods. Its npm advisory is inherited from
- * @medusajs/framework itself, not a flaw of its own.
+ * There is no official Razorpay provider for Medusa v2. Two community packages
+ * exist and the choice between them was not cosmetic:
+ *
+ *   @sgftech/payment-razorpay 2.1.11 installs cleanly but is written for an
+ *   older Medusa — its initiatePayment reads the cart from
+ *   `input.context.extra`, which 2.19 no longer sends, so every payment session
+ *   failed with "cart not ready" thrown from inside the package.
+ *
+ *   medusa-plugin-razorpay-v2 targets the current interface
+ *   (`input.context.idempotency_key`, `{ amount, currency_code }`) and works.
+ *   Its peers hard-pin 2.12.3, which is why .npmrc sets legacy-peer-deps.
  *
  * Gated on the keys so a checkout cannot half-exist: with no keys the payment
  * module keeps only the system provider and checkout stays honestly disabled.
@@ -50,16 +56,16 @@ const paymentModule = razorpayConfigured
         options: {
           providers: [
             {
-              resolve: "@sgftech/payment-razorpay",
+              resolve: "medusa-plugin-razorpay-v2/providers/payment-razorpay/src",
               id: "razorpay",
               options: {
                 key_id: process.env.RAZORPAY_KEY_ID,
                 key_secret: process.env.RAZORPAY_KEY_SECRET,
                 razorpay_account: process.env.RAZORPAY_ACCOUNT,
                 webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET,
-                // Razorpay works in the smallest currency unit; INR prices in
-                // this catalogue are whole rupees.
-                auto_capture: true,
+                auto_expiry: 30,
+                manual_expiry_period: 20,
+                refund_speed: "normal",
               },
             },
           ],
@@ -115,6 +121,7 @@ module.exports = defineConfig({
     }
   },
   modules: [...redisModules, ...paymentModule],
+  plugins: razorpayConfigured ? ["medusa-plugin-razorpay-v2"] : [],
   admin: {
     // The worker service has no HTTP surface, so it has no use for the
     // dashboard bundle either — and building it there wastes minutes.
