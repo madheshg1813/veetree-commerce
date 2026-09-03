@@ -68,4 +68,10 @@ EXPOSE 9000
 # Migrations run on boot rather than as a separate release step: Railway has no
 # release phase, and `db:migrate` is idempotent. The worker service skips it —
 # two services migrating the same database at once is a race.
-CMD ["sh", "-c", "if [ \"$MEDUSA_WORKER_MODE\" != \"worker\" ]; then npx medusa db:migrate; fi && npx medusa start"]
+#
+# The retry is not defensive padding. Railway's private network is not resolvable
+# the instant a container starts, so the first migrate attempt raced DNS and died
+# with "connection timed out after 10 seconds" against a database that was up and
+# healthy the whole time.
+COPY --chown=medusa:medusa apps/backend/entrypoint.sh /app/entrypoint.sh
+CMD ["/app/entrypoint.sh"]
