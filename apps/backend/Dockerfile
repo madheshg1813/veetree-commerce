@@ -43,8 +43,13 @@ ENV MEDUSA_WORKER_MODE=${MEDUSA_WORKER_MODE}
 RUN npx medusa build
 
 # .medusa/server is a fresh package; install its production deps.
+#
+# --legacy-peer-deps is passed explicitly rather than relying on the root
+# .npmrc: npm reads .npmrc from the project directory it is invoked in, and
+# does not walk up parents, so /repo/.npmrc is invisible from here. The flag is
+# needed because the Razorpay plugin pins its Medusa peers to 2.12.3.
 WORKDIR /repo/apps/backend/.medusa/server
-RUN npm install --omit=dev
+RUN npm install --omit=dev --legacy-peer-deps
 
 # ── run ───────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION} AS runner
