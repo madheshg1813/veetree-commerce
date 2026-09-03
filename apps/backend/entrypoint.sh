@@ -29,8 +29,9 @@ if [ -n "$MEDUSA_ADMIN_EMAIL" ] && [ -n "$MEDUSA_ADMIN_PASSWORD" ]; then
 
   # Medusa has no change-password screen and its reset flow needs an email
   # provider, so this is the only way to rotate the admin password: change the
-  # variable and redeploy.
-  npx medusa exec ./src/scripts/set-admin-password.ts \
+  # variable and redeploy. Note the .js: `medusa build` compiles the scripts,
+  # and the runtime image carries the compiled output, not the sources.
+  npx medusa exec ./src/scripts/set-admin-password.js \
     || echo "could not sync the admin password; continuing" >&2
 fi
 
