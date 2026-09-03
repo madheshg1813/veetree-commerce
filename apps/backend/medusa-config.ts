@@ -27,6 +27,47 @@ const reactRoot = (pkg: string) =>
  */
 const redisUrl = process.env.REDIS_URL
 
+/**
+ * Razorpay, registered only when keys are present.
+ *
+ * There is no official Razorpay provider for Medusa v2 — this is a community
+ * package (@sgftech/payment-razorpay). It does implement the real v2 contract:
+ * it extends AbstractPaymentProvider from @medusajs/framework/utils and
+ * provides all ten interface methods. Its npm advisory is inherited from
+ * @medusajs/framework itself, not a flaw of its own.
+ *
+ * Gated on the keys so a checkout cannot half-exist: with no keys the payment
+ * module keeps only the system provider and checkout stays honestly disabled.
+ */
+const razorpayConfigured = Boolean(
+  process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET
+)
+
+const paymentModule = razorpayConfigured
+  ? [
+      {
+        resolve: "@medusajs/medusa/payment",
+        options: {
+          providers: [
+            {
+              resolve: "@sgftech/payment-razorpay",
+              id: "razorpay",
+              options: {
+                key_id: process.env.RAZORPAY_KEY_ID,
+                key_secret: process.env.RAZORPAY_KEY_SECRET,
+                razorpay_account: process.env.RAZORPAY_ACCOUNT,
+                webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET,
+                // Razorpay works in the smallest currency unit; INR prices in
+                // this catalogue are whole rupees.
+                auto_capture: true,
+              },
+            },
+          ],
+        },
+      },
+    ]
+  : []
+
 const redisModules = redisUrl
   ? [
       { resolve: "@medusajs/medusa/cache-redis", options: { redisUrl } },
@@ -73,7 +114,7 @@ module.exports = defineConfig({
       cookieSecret: process.env.COOKIE_SECRET,
     }
   },
-  modules: redisModules,
+  modules: [...redisModules, ...paymentModule],
   admin: {
     // The worker service has no HTTP surface, so it has no use for the
     // dashboard bundle either — and building it there wastes minutes.
