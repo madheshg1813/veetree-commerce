@@ -18,4 +18,12 @@ if [ "$MEDUSA_WORKER_MODE" != "worker" ]; then
   done
 fi
 
+# Seed an admin user when one is named. `medusa user` fails if the address is
+# already taken, which is the normal case on every deploy after the first — so
+# the failure is tolerated rather than allowed to stop the boot.
+if [ -n "$MEDUSA_ADMIN_EMAIL" ] && [ -n "$MEDUSA_ADMIN_PASSWORD" ]; then
+  npx medusa user -e "$MEDUSA_ADMIN_EMAIL" -p "$MEDUSA_ADMIN_PASSWORD" \
+    || echo "admin user already exists (or could not be created); continuing" >&2
+fi
+
 exec npx medusa start
