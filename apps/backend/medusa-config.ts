@@ -61,9 +61,19 @@ const paymentModule = razorpayConfigured
               options: {
                 key_id: process.env.RAZORPAY_KEY_ID,
                 key_secret: process.env.RAZORPAY_KEY_SECRET,
-                razorpay_account: process.env.RAZORPAY_ACCOUNT,
+                /**
+                 * Only ever sent as the X-Razorpay-Account header, which is
+                 * Razorpay's Route (linked sub-account) mechanism. A single
+                 * merchant does not use it, and Razorpay ignores the header
+                 * outright — verified against the live test API, which created
+                 * orders identically with the header absent, empty and bogus.
+                 * The plugin validates its presence regardless, so it defaults
+                 * to empty rather than being left undefined, which crashed the
+                 * payment module on boot.
+                 */
+                razorpay_account: process.env.RAZORPAY_ACCOUNT ?? "",
                 webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET,
-                auto_expiry: 30,
+                automatic_expiry_period: 30,
                 manual_expiry_period: 20,
                 refund_speed: "normal",
               },
