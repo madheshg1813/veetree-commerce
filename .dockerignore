@@ -1,0 +1,15 @@
+# Everything the image must not carry: local installs, build output, secrets.
+**/node_modules
+**/.medusa
+**/.next
+**/.turbo
+**/dist
+**/build
+**/coverage
+**/.env
+**/.env.*
+!**/.env.template
+.git
+**/.DS_Store
+*.log
+apps/storefront
