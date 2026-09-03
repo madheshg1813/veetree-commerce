@@ -1,4 +1,4 @@
-import { loadEnv, defineConfig } from '@medusajs/framework/utils'
+import { loadEnv, defineConfig, Modules, ContainerRegistrationKeys } from '@medusajs/framework/utils'
 import path from 'path'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
@@ -53,6 +53,14 @@ const paymentModule = razorpayConfigured
   ? [
       {
         resolve: "@medusajs/medusa/payment",
+        /**
+         * Required. The Razorpay provider resolves `payment` and the logger
+         * from the container in its constructor; without these declared the
+         * module loads but every session dies with
+         *   AwilixResolutionError: Could not resolve 'payment'
+         * surfaced to the storefront as a bare 500.
+         */
+        dependencies: [Modules.PAYMENT, ContainerRegistrationKeys.LOGGER],
         options: {
           providers: [
             {
