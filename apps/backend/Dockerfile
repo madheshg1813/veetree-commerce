@@ -26,7 +26,10 @@ WORKDIR /repo
 # Railway's builder for a toolchain the install never used.
 
 # Workspace manifests first, so a dependency-free code change reuses this layer.
-COPY package.json package-lock.json turbo.json ./
+# .npmrc matters here: it carries legacy-peer-deps, which the second install
+# (inside .medusa/server) needs to resolve the Razorpay plugin's over-strict
+# Medusa peer pin. Without it that step failed with ERESOLVE.
+COPY package.json package-lock.json turbo.json .npmrc ./
 COPY apps/backend/package.json ./apps/backend/
 COPY apps/storefront/package.json ./apps/storefront/
 RUN npm ci --workspace=@dtc/backend --include-workspace-root
