@@ -52,9 +52,15 @@ ENV NODE_ENV=production \
 
 COPY --from=builder /repo/apps/backend/.medusa/server ./
 
+# --create-home matters: the Medusa CLI writes through `configstore`, which
+# mkdirs $HOME/.config/medusa on every invocation. A system user without a home
+# made the container die on boot with
+#   EACCES: permission denied, mkdir '/home/medusa/.config/medusa'
 RUN groupadd --system --gid 1001 medusa \
- && useradd  --system --uid 1001 --gid medusa medusa \
- && chown -R medusa:medusa /app
+ && useradd  --system --uid 1001 --gid medusa --create-home --home-dir /home/medusa medusa \
+ && mkdir -p /home/medusa/.config \
+ && chown -R medusa:medusa /app /home/medusa
+ENV HOME=/home/medusa
 USER medusa
 
 EXPOSE 9000
