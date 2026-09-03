@@ -35,4 +35,14 @@ if [ -n "$MEDUSA_ADMIN_EMAIL" ] && [ -n "$MEDUSA_ADMIN_PASSWORD" ]; then
     || echo "could not sync the admin password; continuing" >&2
 fi
 
+# One-shot catalogue seed, gated on a flag so it does not run on every boot.
+# Set RUN_CATALOGUE_SEED=true, deploy, then remove the variable again. The seed
+# deletes the handles it manages (including Medusa's demo products) before
+# recreating them, so re-running updates rather than duplicates.
+if [ "$RUN_CATALOGUE_SEED" = "true" ]; then
+  echo "seeding the VeeTree catalogue…" >&2
+  npx medusa exec ./src/scripts/seed-veetree-full.js \
+    || echo "catalogue seed failed; continuing so the server still starts" >&2
+fi
+
 exec npx medusa start

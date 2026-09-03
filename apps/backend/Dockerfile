@@ -73,5 +73,8 @@ EXPOSE 9000
 # the instant a container starts, so the first migrate attempt raced DNS and died
 # with "connection timed out after 10 seconds" against a database that was up and
 # healthy the whole time.
+# The catalogue seed reads the founder's sheet from the working directory, so
+# the sheet has to be in the image for the seed to run on Railway at all.
+COPY --chown=medusa:medusa ["VEETREE products description  - Products.csv", "/app/"]
 COPY --chown=medusa:medusa apps/backend/entrypoint.sh /app/entrypoint.sh
 CMD ["/app/entrypoint.sh"]
