@@ -56,7 +56,15 @@ const brandAdmin = () => ({
       `var swap=function(){var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT),n;` +
       `while((n=w.nextNode())){if(n.nodeValue&&n.nodeValue.indexOf("Welcome to Medusa")>-1){` +
       `n.nodeValue=n.nodeValue.split("Welcome to Medusa").join("Welcome to Veetree");}}};` +
-      `var start=function(){swap();new MutationObserver(swap).observe(document.body,` +
+      // The sign-in card carries Medusa's own logo as an inline 400x400 svg.
+      // Repainted with the Veetree mark rather than hidden, so the card still
+      // has something above the greeting.
+      `var MARK='<defs> <linearGradient id="vtLogoG" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#F5D98B"/> <stop offset="0.5" stop-color="#C8912F"/> <stop offset="1" stop-color="#8A5E14"/> </linearGradient> </defs> <rect width="64" height="64" rx="14" fill="#0F2A1D"/> <path d="M32 11 L45 31 H19 Z" fill="url(#vtLogoG)"/> <rect x="30.4" y="30" width="3.2" height="13" fill="url(#vtLogoG)"/> <g stroke="url(#vtLogoG)" stroke-width="2.1" stroke-linecap="round" fill="none"> <path d="M32 42 C32 47 27 48 23 53"/> <path d="M32 42 C32 47 37 48 41 53"/> <path d="M32 42 L32 52"/> <path d="M28.5 46 C26 48 25 50 24.5 52"/> <path d="M35.5 46 C38 48 39 50 39.5 52"/> </g>';` +
+      `var logo=function(){var s=document.querySelector('svg[viewBox="0 0 400 400"]');` +
+      `if(s&&!s.getAttribute("data-veetree")){s.setAttribute("data-veetree","1");` +
+      `s.setAttribute("viewBox","0 0 64 64");s.innerHTML=MARK;}};` +
+      `var start=function(){swap();logo();` +
+      `new MutationObserver(function(){swap();logo();}).observe(document.body,` +
       `{childList:true,subtree:true,characterData:true});};` +
       `if(document.body){start();}else{document.addEventListener("DOMContentLoaded",start);}` +
       `})();</script>`
