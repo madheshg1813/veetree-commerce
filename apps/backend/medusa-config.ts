@@ -15,6 +15,44 @@ const reactRoot = (pkg: string) =>
   path.dirname(require.resolve(`${pkg}/package.json`, { paths: [__dirname] }))
 
 /**
+ * Brands the admin dashboard as Veetree.
+ *
+ * Two things the stock dashboard leaves generic: the browser tab reads
+ * "<page> - Medusa", and the favicon is a blank `data:,` placeholder. Neither
+ * is configurable, so this rewrites the built index.html and adds a small
+ * script for the title — the dashboard sets `document.title` at runtime as you
+ * navigate, so a static replacement alone would be overwritten on the first
+ * route change.
+ *
+ * Deliberately limited to the tab: restyling the dashboard itself would mean
+ * fighting Medusa's design system on every upgrade, for a UI that is already
+ * clean.
+ */
+const FAVICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjRjVEOThCIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjQzg5MTJGIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhBNUUxNCIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwRjJBMUQiLz4KICA8cGF0aCBkPSJNMzIgMTEgTDQ1IDMxIEgxOSBaIiBmaWxsPSJ1cmwoI2cpIi8+CiAgPHJlY3QgeD0iMzAuNCIgeT0iMzAiIHdpZHRoPSIzLjIiIGhlaWdodD0iMTMiIGZpbGw9InVybCgjZykiLz4KICA8ZyBzdHJva2U9InVybCgjZykiIHN0cm9rZS13aWR0aD0iMi4xIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiPgogICAgPHBhdGggZD0iTTMyIDQyIEMzMiA0NyAyNyA0OCAyMyA1MyIvPgogICAgPHBhdGggZD0iTTMyIDQyIEMzMiA0NyAzNyA0OCA0MSA1MyIvPgogICAgPHBhdGggZD0iTTMyIDQyIEwzMiA1MiIvPgogICAgPHBhdGggZD0iTTI4LjUgNDYgQzI2IDQ4IDI1IDUwIDI0LjUgNTIiLz4KICAgIDxwYXRoIGQ9Ik0zNS41IDQ2IEMzOCA0OCAzOSA1MCAzOS41IDUyIi8+CiAgPC9nPgo8L3N2Zz4K"
+
+const brandAdmin = () => ({
+  name: "veetree-admin-branding",
+  transformIndexHtml(html: string) {
+    // The built index.html carries no <title> and no icon — the dashboard sets
+    // the title at runtime — so these are injected at the end of <head> rather
+    // than replacing anything.
+    const head =
+      `<title>Veetree</title>` +
+      `<link rel="icon" href="${FAVICON}" />` +
+      `<script>(function(){` +
+      // Medusa injects its own blank "data:," icon, and does so after this
+      // transform runs — so it is dropped at runtime rather than by string
+      // surgery on the built HTML.
+      `var ph=document.querySelector('link[data-placeholder-favicon]');if(ph){ph.remove();}` +
+      `var f=function(){var t=document.title;` +
+      `if(t&&t.indexOf("Medusa")>-1){document.title=t.replace(/Medusa/g,"Veetree");}};` +
+      `f();var o=new MutationObserver(f);` +
+      `o.observe(document.head,{childList:true,subtree:true,characterData:true});})();</script>`
+    return html.replace("</head>", `${head}</head>`)
+  },
+})
+
+/**
  * Redis-backed modules, used only when REDIS_URL is set.
  *
  * Without them Medusa falls back to an in-memory event bus, cache, workflow
@@ -146,6 +184,7 @@ module.exports = defineConfig({
     disable: process.env.MEDUSA_WORKER_MODE === "worker",
     vite: (config: any) => ({
       ...config,
+      plugins: [...(config.plugins ?? []), brandAdmin()],
       resolve: {
         ...config.resolve,
         dedupe: [
