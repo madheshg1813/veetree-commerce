@@ -68,3 +68,4 @@ Note what this does: Medusa's prices then override the ones committed in
 `veetree-web/src/lib/catalog/products/*.ts`. Enter the price list in the
 dashboard before switching the storefront over, or the site will show whatever
 Medusa happens to hold.
+Test Key Secret
