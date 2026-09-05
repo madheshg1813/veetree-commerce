@@ -47,7 +47,19 @@ const brandAdmin = () => ({
       `var f=function(){var t=document.title;` +
       `if(t&&t.indexOf("Medusa")>-1){document.title=t.replace(/Medusa/g,"Veetree");}};` +
       `f();var o=new MutationObserver(f);` +
-      `o.observe(document.head,{childList:true,subtree:true,characterData:true});})();</script>`
+      `o.observe(document.head,{childList:true,subtree:true,characterData:true});` +
+      // The login screen greets you with "Welcome to Medusa". That string is
+      // baked into the dashboard bundle (i18n key login.title), so it is
+      // swapped in the DOM. Deliberately an exact-phrase match on text nodes
+      // only: a blanket "Medusa" replace would also rewrite copy about the
+      // Medusa API, where the product's real name is the correct word.
+      `var swap=function(){var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT),n;` +
+      `while((n=w.nextNode())){if(n.nodeValue&&n.nodeValue.indexOf("Welcome to Medusa")>-1){` +
+      `n.nodeValue=n.nodeValue.split("Welcome to Medusa").join("Welcome to Veetree");}}};` +
+      `var start=function(){swap();new MutationObserver(swap).observe(document.body,` +
+      `{childList:true,subtree:true,characterData:true});};` +
+      `if(document.body){start();}else{document.addEventListener("DOMContentLoaded",start);}` +
+      `})();</script>`
     return html.replace("</head>", `${head}</head>`)
   },
 })
