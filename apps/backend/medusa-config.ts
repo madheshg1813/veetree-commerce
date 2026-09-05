@@ -73,6 +73,44 @@ const brandAdmin = () => ({
 })
 
 /**
+ * Cloudinary for dashboard uploads.
+ *
+ * Railway's filesystem is ephemeral, so the default local file provider would
+ * lose every uploaded image on the next deploy. Cloudinary already holds the
+ * storefront's photography, so uploads join it there.
+ *
+ * Gated on the credentials being present: without them Medusa keeps its local
+ * provider, which is right for a laptop.
+ */
+const cloudinaryConfigured = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+)
+
+const fileModule = cloudinaryConfigured
+  ? [
+      {
+        resolve: "@medusajs/medusa/file",
+        options: {
+          providers: [
+            {
+              resolve: "./src/modules/cloudinary-file",
+              id: "cloudinary",
+              options: {
+                cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+                apiKey: process.env.CLOUDINARY_API_KEY,
+                apiSecret: process.env.CLOUDINARY_API_SECRET,
+                folder: process.env.CLOUDINARY_FOLDER || "veetree",
+              },
+            },
+          ],
+        },
+      },
+    ]
+  : []
+
+/**
  * Redis-backed modules, used only when REDIS_URL is set.
  *
  * Without them Medusa falls back to an in-memory event bus, cache, workflow
@@ -196,7 +234,7 @@ module.exports = defineConfig({
       cookieSecret: process.env.COOKIE_SECRET,
     }
   },
-  modules: [...redisModules, ...paymentModule],
+  modules: [...redisModules, ...paymentModule, ...fileModule],
   plugins: razorpayConfigured ? ["medusa-plugin-razorpay-v2"] : [],
   admin: {
     // The worker service has no HTTP surface, so it has no use for the
