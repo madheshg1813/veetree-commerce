@@ -1,5 +1,5 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
-import { Container, Heading, Text, Input, Button, Badge, Toaster, toast } from "@medusajs/ui"
+import { Container, Heading, Text, Input, Button, Badge, Select, Checkbox, Toaster, toast } from "@medusajs/ui"
 import { useEffect, useMemo, useState } from "react"
 
 interface Row {
@@ -9,7 +9,12 @@ interface Row {
   variantTitle: string
   sku: string | null
   price: number | null
+  categories?: string[]
 }
+
+const ALL = "__all__"
+/** Anything below this is questioned on save — see the API route. */
+const LOW_PRICE = 50
 
 /**
  * The whole price sheet on one screen.
@@ -24,6 +29,8 @@ const PricesPage = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState("")
+  const [category, setCategory] = useState(ALL)
+  const [allowLow, setAllowLow] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -52,16 +59,36 @@ const PricesPage = () => {
     [rows, draft]
   )
 
+  /** Categories present in the catalogue, in menu order where recognised. */
+  const categories = useMemo(() => {
+    const order = ["Face Care", "Hair Care", "Body Care", "Lip Care", "Eye Care"]
+    const found = new Set<string>()
+    for (const r of rows) for (const c of r.categories ?? []) found.add(c)
+    const known = order.filter((c) => found.has(c))
+    const rest = [...found].filter((c) => !order.includes(c)).sort()
+    return [...known, ...rest]
+  }, [rows])
+
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(
-      (r) =>
+    return rows.filter((r) => {
+      if (category !== ALL && !(r.categories ?? []).includes(category)) return false
+      if (!q) return true
+      return (
         r.productTitle.toLowerCase().includes(q) ||
         (r.sku ?? "").toLowerCase().includes(q) ||
         r.variantTitle.toLowerCase().includes(q)
-    )
-  }, [rows, filter])
+      )
+    })
+  }, [rows, filter, category])
+
+  const lowEdits = useMemo(
+    () => changed.filter((r) => {
+      const n = Number(draft[r.variantId])
+      return n > 0 && n < LOW_PRICE
+    }),
+    [changed, draft]
+  )
 
   const save = async () => {
     if (changed.length === 0) return
@@ -73,6 +100,7 @@ const PricesPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prices: changed.map((r) => ({ variantId: r.variantId, price: Number(draft[r.variantId]) })),
+          confirmLow: allowLow,
         }),
       })
       if (!res.ok) {
@@ -99,15 +127,53 @@ const PricesPage = () => {
         </Text>
       </div>
 
-      <div className="flex items-center gap-x-3 px-6 py-3">
-        <Input
-          placeholder="Filter by product, size or SKU"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        <Button onClick={save} isLoading={saving} disabled={loading || changed.length === 0}>
-          {changed.length ? `Save ${changed.length}` : "Save"}
-        </Button>
+      <div className="flex flex-col gap-y-3 px-6 py-3">
+        <div className="flex items-center gap-x-3">
+          <div className="w-56">
+            <Select value={category} onValueChange={setCategory}>
+              <Select.Trigger>
+                <Select.Value placeholder="All categories" />
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value={ALL}>All categories</Select.Item>
+                {categories.map((c) => (
+                  <Select.Item key={c} value={c}>
+                    {c}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select>
+          </div>
+          <Input
+            placeholder="Filter by product, size or SKU"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <Button onClick={save} isLoading={saving} disabled={loading || changed.length === 0}>
+            {changed.length ? `Save ${changed.length}` : "Save"}
+          </Button>
+        </div>
+        <div className="flex items-center gap-x-4">
+          <Text size="xsmall" className="text-ui-fg-muted">
+            {shown.length} of {rows.length} sizes
+            {category === ALL ? "" : ` in ${category}`}
+          </Text>
+          {lowEdits.length ? (
+            <div className="flex items-center gap-x-2">
+              <Checkbox
+                id="allow-low"
+                checked={allowLow}
+                onCheckedChange={(v) => setAllowLow(v === true)}
+              />
+              <Text size="xsmall" className="text-ui-fg-error">
+                <label htmlFor="allow-low">
+                  {lowEdits.length === 1 ? "One price is" : `${lowEdits.length} prices are`} under
+                  ₹{LOW_PRICE} — tick to allow
+                </label>
+              </Text>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="px-6 py-4">

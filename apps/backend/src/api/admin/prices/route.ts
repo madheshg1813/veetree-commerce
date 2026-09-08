@@ -11,6 +11,7 @@ interface Row {
   variantTitle: string
   sku: string | null
   price: number | null
+  categories: string[]
 }
 
 /**
@@ -34,6 +35,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       "variants.sku",
       "variants.prices.amount",
       "variants.prices.currency_code",
+      "categories.name",
     ],
     pagination: { take: 500, skip: 0 },
   })
@@ -47,6 +49,10 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         prices?: { amount?: number; currency_code?: string }[]
       }).prices ?? []
       const inr = prices.find((pr) => pr.currency_code === CURRENCY)
+      const categories = ((p as unknown as { categories?: { name?: string }[] }).categories ?? [])
+        .map((c) => c.name)
+        .filter((n): n is string => Boolean(n))
+
       rows.push({
         productId: p.id,
         productTitle: p.title,
@@ -54,6 +60,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         variantTitle: v.title ?? "",
         sku: v.sku ?? null,
         price: typeof inr?.amount === "number" ? inr.amount : null,
+        categories,
       })
     }
   }
@@ -74,7 +81,11 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
  * catalogue.
  */
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
-  const body = req.body as { prices?: { variantId?: unknown; price?: unknown }[] }
+  const body = req.body as {
+    prices?: { variantId?: unknown; price?: unknown }[]
+    confirmLow?: unknown
+  }
+  const confirmLow = body?.confirmLow === true
   const incoming = Array.isArray(body?.prices) ? body.prices : []
   if (incoming.length === 0) {
     throw new MedusaError(MedusaError.Types.INVALID_DATA, "No prices were sent.")
@@ -88,6 +99,20 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         `"${row.price}" is not a valid price.`
+      )
+    }
+    /**
+     * Refuse a suspiciously small price unless it is confirmed.
+     *
+     * A part-typed entry once saved a 239 rupee pack at 15, and the storefront
+     * charged it — the whole chain works, which is exactly what makes the
+     * mistake expensive. Nothing here is genuinely under 50 rupees, so that is
+     * a safe floor to question.
+     */
+    if (amount > 0 && amount < 50 && !confirmLow) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        `₹${amount} looks like a mistyped price. Re-enter it and tick "allow prices under ₹50" if it is deliberate.`
       )
     }
     updates.push({ id: row.variantId, prices: [{ amount, currency_code: CURRENCY }] })
