@@ -118,9 +118,20 @@ const OrderTableColumns = () => {
           billCell.className = template
           const button = document.createElement("button")
           button.type = "button"
-          button.textContent = "🖨"
-          button.title = "Print the bill"
-          button.style.cssText = "cursor:pointer;background:none;border:0;font-size:15px;line-height:1"
+          // The same printer as the widgets use, written as markup because
+          // this button is built by hand rather than by React.
+          button.innerHTML =
+            '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor"' +
+            ' stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+            '<path d="M4 5.5V2h7v3.5"/>' +
+            '<path d="M4 11H2.8A1.3 1.3 0 0 1 1.5 9.7V6.8A1.3 1.3 0 0 1 2.8 5.5h9.4a1.3 1.3 0 0 1 1.3 1.3v2.9a1.3 1.3 0 0 1-1.3 1.3H11"/>' +
+            '<path d="M4 9h7v4H4z"/></svg>'
+          button.title = "Print the parcel label"
+          button.setAttribute("aria-label", "Print the parcel label")
+          button.style.cssText =
+            "cursor:pointer;background:none;border:0;padding:2px;line-height:0;color:inherit;opacity:.7"
+          button.addEventListener("mouseenter", () => { button.style.opacity = "1" })
+          button.addEventListener("mouseleave", () => { button.style.opacity = ".7" })
           button.addEventListener("click", (e) => {
             // The row itself navigates to the order; printing must not.
             e.preventDefault()

@@ -12,6 +12,7 @@ import {
   isCourier,
   savedShipment,
 } from "../../../lib/couriers"
+import { sendTrackingEmail } from "../../../lib/shipment-email"
 
 interface OrderRow {
   id: string
@@ -135,10 +136,26 @@ export async function POST(req: AuthenticatedMedusaRequest, res: MedusaResponse)
   const query = req.scope.resolve("query")
   const { data } = await query.graph({
     entity: "order",
-    fields: ["id", "metadata"],
+    // Enough to write the customer's email, and "version" for the same reason
+    // the list query needs it: asking for `total` computes the totals.
+    fields: [
+      "id",
+      "version",
+      "display_id",
+      "email",
+      "total",
+      "metadata",
+      "shipping_address.*",
+      "items.title",
+      "items.variant_title",
+      "items.quantity",
+    ],
     filters: { id: orderId },
   })
-  const existing = ((data as unknown as OrderRow[])[0]?.metadata ?? {}) as Record<string, unknown>
+  const order = (data as unknown as OrderRow[])[0]
+  const existing = (order?.metadata ?? {}) as Record<string, unknown>
+  const before = savedShipment(existing)
+  const tracking = (body.tracking ?? "").trim()
 
   await updateOrderWorkflow(req.scope).run({
     input: {
@@ -148,10 +165,44 @@ export async function POST(req: AuthenticatedMedusaRequest, res: MedusaResponse)
       metadata: {
         ...existing,
         [COURIER_FIELD]: courier || null,
-        [TRACKING_FIELD]: (body.tracking ?? "").trim() || null,
+        [TRACKING_FIELD]: tracking || null,
       },
     },
   })
 
-  res.json({ ok: true })
+  /*
+   * Tell the customer, but only when the tracking number is genuinely new.
+   * Saving the same number again — which happens whenever the courier is
+   * corrected, or Save is pressed twice — must not send a second email.
+   */
+  const isNew = Boolean(tracking) && tracking !== before.tracking
+  let emailed = false
+  let emailReason: string | null = null
+
+  if (isNew && courier && order) {
+    const addr = order.shipping_address ?? null
+    const result = await sendTrackingEmail(
+      {
+        number: typeof order.display_id === "number" ? order.display_id : null,
+        email: order.email ?? null,
+        name: [addr?.first_name, addr?.last_name].filter(Boolean).join(" ") || null,
+        address: [addr?.address_1, addr?.address_2].filter(Boolean).join(", ") || null,
+        city: addr?.city ?? null,
+        postalCode: addr?.postal_code ?? null,
+        total: typeof order.total === "number" ? order.total : null,
+        items: (order.items ?? []).map((i) => ({
+          title: i.title ?? "",
+          size: i.variant_title ?? null,
+          qty: i.quantity ?? 1,
+        })),
+      },
+      courier,
+      tracking
+    )
+    emailed = result.sent
+    if (!result.sent) emailReason = result.reason
+  }
+
+  // The save succeeded either way; the dashboard says whether the mail went.
+  res.json({ ok: true, emailed, emailReason })
 }
