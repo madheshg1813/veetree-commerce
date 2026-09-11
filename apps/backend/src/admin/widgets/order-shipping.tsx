@@ -3,6 +3,19 @@ import { Container, Heading, Text, Input, Button, Select, Table, Toaster, toast 
 import { useEffect, useState } from "react"
 import { buildInvoice, type InvoiceOrder } from "../lib/invoice"
 
+/**
+ * The dashboard authenticates with a JWT held in localStorage, not a cookie,
+ * so a fetch without this header is anonymous and comes back 401.
+ */
+const authHeaders = (): Record<string, string> => {
+  let token: string | null = null
+  try { token = window.localStorage.getItem("medusa_auth_token") } catch { /* blocked */ }
+  if (!token) {
+    try { token = window.sessionStorage.getItem("medusa_auth_token") } catch { /* blocked */ }
+  }
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 interface Courier { id: string; name: string }
 interface Order extends InvoiceOrder {
   id: string
@@ -31,7 +44,7 @@ const OrderShippingWidget = () => {
   const [draft, setDraft] = useState<Record<string, { courier: string; tracking: string }>>({})
 
   const load = () => {
-    fetch("/admin/shipping", { credentials: "include" })
+    fetch("/admin/shipping", { credentials: "include", headers: authHeaders() })
       .then((r) => r.json())
       .then((d: { orders?: Order[]; couriers?: Courier[] }) => {
         const list = d.orders ?? []
@@ -62,7 +75,7 @@ const OrderShippingWidget = () => {
       const res = await fetch("/admin/shipping", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ orderId: o.id, courier: row.courier, tracking: row.tracking }),
       })
       if (!res.ok) throw new Error()

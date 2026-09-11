@@ -143,8 +143,21 @@ export const ORDERS_TABLE_SCRIPT = `(function(){
     }
   }
 
+  /*
+   * The dashboard authenticates with a JWT it keeps in localStorage under
+   * "medusa_auth_token" and sends as a bearer token — it is not a cookie
+   * session. A fetch with only credentials:"include" is therefore anonymous
+   * and comes back 401, which is exactly why nothing appeared here before.
+   */
+  function authHeaders(){
+    var t = null;
+    try { t = window.localStorage.getItem("medusa_auth_token"); } catch(e){}
+    if(!t){ try { t = window.sessionStorage.getItem("medusa_auth_token"); } catch(e){} }
+    return t ? { Authorization: "Bearer " + t } : {};
+  }
+
   function load(){
-    fetch("/admin/shipping", { credentials: "include" })
+    fetch("/admin/shipping", { credentials: "include", headers: authHeaders() })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
         if(!d) return;

@@ -2,6 +2,19 @@ import { defineWidgetConfig } from "@medusajs/admin-sdk"
 import { useEffect } from "react"
 import { buildInvoice, type InvoiceOrder } from "../lib/invoice"
 
+/**
+ * The dashboard authenticates with a JWT held in localStorage, not a cookie,
+ * so a fetch without this header is anonymous and comes back 401.
+ */
+const authHeaders = (): Record<string, string> => {
+  let token: string | null = null
+  try { token = window.localStorage.getItem("medusa_auth_token") } catch { /* blocked */ }
+  if (!token) {
+    try { token = window.sessionStorage.getItem("medusa_auth_token") } catch { /* blocked */ }
+  }
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 interface Courier { id: string; name: string }
 interface Order extends InvoiceOrder {
   id: string
@@ -128,7 +141,7 @@ const OrderTableColumns = () => {
       }
     }
 
-    fetch("/admin/shipping", { credentials: "include" })
+    fetch("/admin/shipping", { credentials: "include", headers: authHeaders() })
       .then((r) => r.json())
       .then((d: { orders?: Order[]; couriers?: Courier[] }) => {
         if (stopped) return
