@@ -240,18 +240,21 @@ module.exports = defineConfig({
     // The worker service has no HTTP surface, so it has no use for the
     // dashboard bundle either — and building it there wastes minutes.
     disable: process.env.MEDUSA_WORKER_MODE === "worker",
-    vite: (config: any) => ({
-      ...config,
-      plugins: [...(config.plugins ?? []), brandAdmin()],
+    /**
+     * Return only what is being added, never a spread of the config passed in.
+     *
+     * Medusa does `mergeConfig(baseConfig, yourConfig)`, and Vite's mergeConfig
+     * concatenates arrays rather than replacing them. Spreading `config` back
+     * therefore handed every base plugin in a second time — including
+     * @vitejs/plugin-react, whose refresh preamble was then injected twice and
+     * broke every admin page with "The symbol inWebWorker has already been
+     * declared". The merge supplies the rest.
+     */
+    vite: () => ({
+      plugins: [brandAdmin()],
       resolve: {
-        ...config.resolve,
-        dedupe: [
-          ...(config.resolve?.dedupe ?? []),
-          'react',
-          'react-dom',
-        ],
+        dedupe: ['react', 'react-dom'],
         alias: {
-          ...(config.resolve?.alias ?? {}),
           react: reactRoot('react'),
           'react-dom': reactRoot('react-dom'),
         },
