@@ -45,6 +45,9 @@ interface OrderRow {
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const query = req.scope.resolve("query")
 
+  // The order detail page asks for one order; the list asks for all of them.
+  const only = typeof req.query?.orderId === "string" ? req.query.orderId : null
+
   const { data } = await query.graph({
     entity: "order",
     fields: [
@@ -71,7 +74,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       "items.quantity",
       "items.unit_price",
     ],
-    pagination: { take: 100, skip: 0, order: { created_at: "DESC" } },
+    ...(only ? { filters: { id: only } } : {}),
+    pagination: { take: only ? 1 : 100, skip: 0, order: { created_at: "DESC" } },
   })
 
   const orders = (data as unknown as OrderRow[]).map((o) => {
