@@ -49,6 +49,16 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     entity: "order",
     fields: [
       "id",
+      /*
+       * Not shown anywhere, but the query fails without it. Asking for `total`
+       * makes Medusa compute the order's totals, which loads its shipping
+       * methods and then their adjustments — and that step throws "Shipping
+       * method version is required to load adjustments" unless the order's
+       * version has been selected, because the join rows take their version
+       * from it. An order with no shipping method never reaches that code,
+       * which is why a seeded test order passed while every real one failed.
+       */
+      "version",
       "display_id",
       "created_at",
       "email",
