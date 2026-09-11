@@ -1,0 +1,182 @@
+import { defineWidgetConfig } from "@medusajs/admin-sdk"
+import { Container, Heading, Text, Input, Button, Select, Table, Toaster, toast } from "@medusajs/ui"
+import { useEffect, useState } from "react"
+import { buildInvoice, type InvoiceOrder } from "../lib/invoice"
+
+interface Courier { id: string; name: string }
+interface Order extends InvoiceOrder {
+  id: string
+  state: string | null
+  courier: string | null
+  auto: string | null
+}
+
+/**
+ * The despatch strip, directly under Medusa's own order list.
+ *
+ * Medusa's table cannot take an extra column: the admin exposes only
+ * `order.list.before` and `order.list.after`, and a custom route cannot shadow
+ * a core one — custom routes are spliced in after the built-in ones, so the
+ * built-in `/orders` always wins. This sits immediately below that table
+ * instead, on the same screen, carrying the courier and the print button the
+ * table itself has no room for.
+ *
+ * The full page at Shipping shows the same thing with the delivery address.
+ */
+const OrderShippingWidget = () => {
+  const [orders, setOrders] = useState<Order[]>([])
+  const [couriers, setCouriers] = useState<Courier[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<Record<string, { courier: string; tracking: string }>>({})
+
+  const load = () => {
+    fetch("/admin/shipping", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d: { orders?: Order[]; couriers?: Courier[] }) => {
+        const list = d.orders ?? []
+        setOrders(list)
+        setCouriers(d.couriers ?? [])
+        setDraft(
+          Object.fromEntries(
+            list.map((o) => [o.id, { courier: o.courier ?? o.auto ?? "", tracking: o.tracking ?? "" }])
+          )
+        )
+      })
+      .catch(() => toast.error("Could not load shipping details."))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(load, [])
+
+  const nameOf = (id: string) => couriers.find((c) => c.id === id)?.name ?? id
+
+  const setRow = (id: string, patch: Partial<{ courier: string; tracking: string }>) =>
+    setDraft((d) => ({ ...d, [id]: { ...(d[id] ?? { courier: "", tracking: "" }), ...patch } }))
+
+  const save = async (o: Order) => {
+    const row = draft[o.id]
+    if (!row) return
+    setSavingId(o.id)
+    try {
+      const res = await fetch("/admin/shipping", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: o.id, courier: row.courier, tracking: row.tracking }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(`Order #${o.number ?? ""} updated.`)
+      load()
+    } catch {
+      toast.error("Could not save. Please try again.")
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const print = (o: Order) => {
+    const row = draft[o.id]
+    if (!row?.courier) {
+      toast.error("Choose a courier for this order first.")
+      return
+    }
+    const win = window.open("", "_blank", "width=820,height=900")
+    if (!win) {
+      toast.error("Your browser blocked the print window. Allow pop-ups for this site.")
+      return
+    }
+    win.document.write(
+      buildInvoice({ ...o, tracking: row.tracking }, nameOf(row.courier))
+    )
+    win.document.close()
+  }
+
+  if (loading) return null
+  if (!orders.length) return null
+
+  return (
+    <Container className="divide-y p-0">
+      <div className="px-6 py-4">
+        <Heading level="h2">Courier &amp; bill</Heading>
+        <Text size="small" className="text-ui-fg-subtle">
+          Tamil Nadu pin codes are set to ST Courier automatically. Choose the courier yourself for
+          anywhere else.
+        </Text>
+      </div>
+
+      <div className="overflow-x-auto">
+        <Table>
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell>Order</Table.HeaderCell>
+              <Table.HeaderCell>Courier</Table.HeaderCell>
+              <Table.HeaderCell>Tracking</Table.HeaderCell>
+              <Table.HeaderCell>Total</Table.HeaderCell>
+              <Table.HeaderCell>Bill</Table.HeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {orders.map((o) => {
+              const row = draft[o.id] ?? { courier: o.auto ?? "", tracking: "" }
+              return (
+                <Table.Row key={o.id}>
+                  <Table.Cell>
+                    <Text size="small" weight="plus">#{o.number ?? "—"}</Text>
+                    <Text size="xsmall" className="text-ui-fg-subtle">
+                      {[o.city, o.state].filter(Boolean).join(", ")}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Select size="small" value={row.courier} onValueChange={(v) => setRow(o.id, { courier: v })}>
+                      <Select.Trigger>
+                        <Select.Value placeholder="Choose courier" />
+                      </Select.Trigger>
+                      <Select.Content>
+                        {couriers.map((c) => (
+                          <Select.Item key={c.id} value={c.id}>{c.name}</Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select>
+                    {!o.courier && o.auto ? (
+                      <Text size="xsmall" className="text-ui-fg-subtle">automatic · Tamil Nadu</Text>
+                    ) : null}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Input
+                      size="small"
+                      placeholder="Tracking number"
+                      value={row.tracking}
+                      onChange={(e) => setRow(o.id, { tracking: e.target.value })}
+                    />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text size="small">
+                      {o.total !== null ? `₹${o.total.toLocaleString("en-IN")}` : "—"}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <div className="flex gap-2">
+                      <Button size="small" variant="secondary" onClick={() => save(o)} disabled={savingId === o.id}>
+                        {savingId === o.id ? "Saving…" : "Save"}
+                      </Button>
+                      <Button size="small" variant="transparent" onClick={() => print(o)} title="Print the bill">
+                        🖨
+                      </Button>
+                    </div>
+                  </Table.Cell>
+                </Table.Row>
+              )
+            })}
+          </Table.Body>
+        </Table>
+      </div>
+
+      <Toaster />
+    </Container>
+  )
+}
+
+export const config = defineWidgetConfig({ zone: "order.list.after" })
+
+export default OrderShippingWidget
