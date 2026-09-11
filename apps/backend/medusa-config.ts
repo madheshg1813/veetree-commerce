@@ -1,3 +1,5 @@
+import { ORDERS_TABLE_SCRIPT } from "./src/lib/admin-orders-script"
+
 import { loadEnv, defineConfig, Modules, ContainerRegistrationKeys } from '@medusajs/framework/utils'
 import path from 'path'
 
@@ -68,7 +70,15 @@ const brandAdmin = () => ({
       `{childList:true,subtree:true,characterData:true});};` +
       `if(document.body){start();}else{document.addEventListener("DOMContentLoaded",start);}` +
       `})();</script>`
-    return html.replace("</head>", `${head}</head>`)
+    /*
+     * The order table's extra columns ride along here rather than as a widget.
+     * Widgets in this dashboard are placed by a LayoutComposer with a saved
+     * layout per page, so a new one is not guaranteed to be rendered — two
+     * were registered correctly and neither appeared. A script in the document
+     * runs whatever the layout store thinks.
+     */
+    const withColumns = `<script>${ORDERS_TABLE_SCRIPT}</script>`
+    return html.replace("</head>", `${head}${withColumns}</head>`)
   },
 })
 
