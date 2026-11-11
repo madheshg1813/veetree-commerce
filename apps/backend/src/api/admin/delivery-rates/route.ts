@@ -1,9 +1,12 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, MedusaError } from "@medusajs/framework/utils"
-import { updateShippingOptionsWorkflow } from "@medusajs/core-flows"
 import {
+  basePrice,
   getRates,
   listOptions,
+  ownPrices,
+  restatePrice,
+  setOptionPrices,
   OPTION_NAMES,
   WEIGHT_KEY,
   type RateKey,
@@ -50,9 +53,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       missing.push(name)
       continue
     }
-    await updateShippingOptionsWorkflow(req.scope).run({
-      input: [{ id: option.id, prices: [{ amount, currency_code: "inr" }] }],
-    })
+    // Only the flat INR charge changes. Writing prices replaces the whole list,
+    // so every other price on the option — a ₹0 free-shipping condition, a
+    // region price — is sent back as it was, or it would be deleted.
+    const base = basePrice(option)
+    const kept = ownPrices(option)
+      .filter((p) => p.id !== base?.id)
+      .map((p) => restatePrice(option, p))
+    await setOptionPrices(req.scope, option.id, [
+      base ? { id: base.id, amount, currency_code: "inr" } : { amount, currency_code: "inr" },
+      ...kept,
+    ])
   }
 
   if (body.breakG !== undefined || body.packagingG !== undefined) {
